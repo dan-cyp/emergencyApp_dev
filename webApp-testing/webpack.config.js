@@ -10,9 +10,12 @@ const rootConfig = {
 
 const appConfig = {
   ...rootConfig,
-  entry: './src/index.js',
+  entry: {
+    citizens: './src/citizens-index.js',
+    police: './src/police-index.js',
+  },
   output: {
-    filename: 'main.js',
+    filename: '[name]-main.js',
     path: path.resolve(__dirname, 'public/scripts'),
   },
 };

@@ -20,6 +20,8 @@
 
 import {onRequest} from 'firebase-functions/v1/https'
 
+import { getFirestore } from "firebase-admin/firestore";
+
 import * as admin from 'firebase-admin';
 admin.initializeApp();
 
@@ -56,7 +58,7 @@ app.post('/citizens-subscribe_save-token', async (req, res) => {
 
 
         // store uid and token into firestore
-        await admin.firestore()
+        await getFirestore()
             .collection(COLLECTION_FCM_TOKENS_CITIZENS)
             .add({uid, token});
         res.sendStatus(201);
@@ -67,6 +69,7 @@ app.post('/citizens-subscribe_save-token', async (req, res) => {
 });
 
 app.post('/emergencyAlerts', async (req, res) => {
+    // TODO: change uid to ge it from the authentication as userId
     const {uid, lat, lng, createdAt} = req.body;
     console.log('/emergencyAlert', JSON.stringify(req.body));
 
@@ -78,8 +81,9 @@ app.post('/emergencyAlerts', async (req, res) => {
     try{
     // TODO: check that uid, lat, lng and createdAt are valid data)
 
+    // TODO: change to userId
     // store new emergencyAlert in the firestore
-    await admin.firestore()
+    await getFirestore()
         .collection(COLLECTION_EMERGENCY_ALERTS)
         .add({uid, poss: {lat, lng }, createdAt, status: 'created'});
     res.status(201).send({status: 'created'});
@@ -88,6 +92,42 @@ app.post('/emergencyAlerts', async (req, res) => {
         res.sendStatus(500);
     }
 
+});
+
+app.get('/emergencyAlerts/latest/:citizenId', async (req, res) => {
+    const citizenId = req.params.citizenId;
+
+    // sanitize the input
+    if(citizenId === undefined || citizenId === '') {
+        res.sendStatus(400);
+        return;
+    }
+
+    try {
+         // Query the collection for documents with matching citizenId and sort by createdAt in descending order
+        const querySnapshot = await getFirestore()
+            .collection(COLLECTION_EMERGENCY_ALERTS)
+            .where('uid', '==', citizenId)
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+
+        // Check if any matching document was found
+        if (querySnapshot.empty) {
+            return res.sendStatus(404); 
+        }
+
+        // Get the first (latest) document from the query result
+        const document = querySnapshot.docs[0].data();
+        // Access the desired fields from the document
+        const status = document.status;
+
+        return res.send({status});
+        
+    } catch(error) {
+        console.log(error);
+        return res.sendStatus(500);
+    }
 });
 
 exports.app = onRequest(app);
