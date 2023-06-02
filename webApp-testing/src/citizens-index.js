@@ -92,7 +92,6 @@ function authenticatedRequest(method, url, body) {
             console.log('Making authenticatedRequest:', url, options);
             return fetch(url, options)
                 .then(function (response) {
-                    console.log('authenticatedRequest response: ', response.json());
                     if(!response.ok){
                         throw new Error('Request error: ', method, url, response.status);
                     }
@@ -104,7 +103,7 @@ function authenticatedRequest(method, url, body) {
         });
 }
 
-function emergencyAlertPOST() {
+async function emergencyAlertPOST() {
     const lat = latInputElement.value;
     const lng = lngInputElement.value;
 
@@ -114,24 +113,27 @@ function emergencyAlertPOST() {
     // Reset input fields to show that it was sent
     latInputElement.value = '';
     lngInputElement.value = '';
-    // responseElement.textContent = 'waiting';
-    // Make an authenticated POST request to create new EmergencyAlert
-    authenticatedRequest(
-        'POST',
-        `${ENDPOINT_URL_ADDRESS}/emergencyAlerts`,
-        {
-            uid: 'abc',
-            lat: lat,
-            lng: lng,
-            createdAt: "123456"
-        }
-    ).then(function(response) {
-        console.log(response);
-        //responseElement.textContent = JSON.stringify(response);
-    }).catch(function(error) {
-        console.log('Error sending EmergencyAlert: ', error);
+    responsePElement.textContent = 'waiting';
+    
+    try{
+        // Make an authenticated POST request to create new EmergencyAlert
+        const response = await authenticatedRequest(
+            'POST',
+            `${ENDPOINT_URL_ADDRESS}/emergencyAlerts`,
+            {
+                uid: 'abc',
+                lat: lat,
+                lng: lng,
+                createdAt: "123456"
+            });
+            console.log('response', response);
+            const responseText = await response.text();
+            responsePElement.textContent = `${response.status}, ${responseText}`;
+        
+    }catch (error) {
+        console.log('Error sending emergencyAlert: ', error);
         throw error;
-    })
+    }
 }
 
 //////////////////////////////////////////////////////
@@ -147,6 +149,8 @@ var userInfoULElement = document.getElementById('user-info');
 var latInputElement = document.getElementById('lat');
 var lngInputElement = document.getElementById('lng');
 var sendEmergencyAlertBtn = document.getElementById('sendEmergencyAlert');
+
+var responsePElement = document.getElementById('response');
 
 // Adding Event Listeners
 signInButtonElement.addEventListener('click', signIn);
