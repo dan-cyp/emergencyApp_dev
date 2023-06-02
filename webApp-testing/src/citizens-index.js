@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 
 import { getFirebaseConfig } from './firebase-config';
-const ENDPOINT_URL_ADDRESS = 'http://localhost:5001/emergencyapp-development/us-central1/app'
+const ENDPOINT_URL_ADDRESS = 'https://us-central1-emergencyapp-development.cloudfunctions.net/app'
 
 //////////////////////////////////////////////////////
 /////////////// Authentication - START ///////////////
@@ -103,7 +103,7 @@ function authenticatedRequest(method, url, body) {
         });
 }
 
-async function emergencyAlertPOST() {
+async function sendEmergencyAlert() {
     const lat = latInputElement.value;
     const lng = lngInputElement.value;
 
@@ -117,14 +117,16 @@ async function emergencyAlertPOST() {
     
     try{
         // Make an authenticated POST request to create new EmergencyAlert
+        const uid = getAuth().currentUser.uid;
+        const createdAt = Date.now();
         const response = await authenticatedRequest(
             'POST',
             `${ENDPOINT_URL_ADDRESS}/emergencyAlerts`,
             {
-                uid: 'abc',
+                uid: uid,
                 lat: lat,
                 lng: lng,
-                createdAt: "123456"
+                createdAt: createdAt
             });
             console.log('response', response);
             const responseText = await response.text();
@@ -132,6 +134,26 @@ async function emergencyAlertPOST() {
         
     }catch (error) {
         console.log('Error sending emergencyAlert: ', error);
+        throw error;
+    }
+}
+
+async function checkEmergencyAlertStatus() {
+    console.log('Checking EmergencyAlert status.');
+    statusPElement.textContent = '';
+
+    try {
+        const uid = getAuth().currentUser.uid;
+        // Make an authenticated GET request to check status of emergencyAlert
+        const response = await authenticatedRequest(
+            'GET',
+            `${ENDPOINT_URL_ADDRESS}/emergencyAlerts/latest/${uid}`
+        );
+        console.log('response', response);
+        const responseText = await response.text();
+        statusPElement.textContent = `${response.status}, ${responseText}`;
+    } catch (error) {
+        console.log('Error checking EmergencyAlert status: ', error);
         throw error;
     }
 }
@@ -149,16 +171,19 @@ var userInfoULElement = document.getElementById('user-info');
 var latInputElement = document.getElementById('lat');
 var lngInputElement = document.getElementById('lng');
 var sendEmergencyAlertBtn = document.getElementById('sendEmergencyAlert');
-
 var responsePElement = document.getElementById('response');
+
+var checkStatusBtn = document.getElementById('checkStatus');
+var statusPElement = document.getElementById('status');
+
 
 // Adding Event Listeners
 signInButtonElement.addEventListener('click', signIn);
 signOutButtonElement.addEventListener('click', signOutUser);
 
-sendEmergencyAlertBtn.addEventListener('click', emergencyAlertPOST);
+sendEmergencyAlertBtn.addEventListener('click', sendEmergencyAlert);
 
-
+checkStatusBtn.addEventListener('click', checkEmergencyAlertStatus);
 //////////////////////////////////////////////////////
 ////////////////// Main Execution Part ///////////////
 const firebaseApp = initializeApp(getFirebaseConfig());
