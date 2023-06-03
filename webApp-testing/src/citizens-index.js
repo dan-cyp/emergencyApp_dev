@@ -9,8 +9,14 @@ import {
     signOut 
 } from 'firebase/auth';
 
+import {
+    getMessaging,
+    getToken,
+    onMessage
+} from 'firebase/messaging';
+
 import { getFirebaseConfig } from './firebase-config';
-const ENDPOINT_URL_ADDRESS = 'https://us-central1-emergencyapp-development.cloudfunctions.net/app'
+const ENDPOINT_URL_ADDRESS = 'http://localhost:5001/emergencyapp-development/us-central1/app';
 
 //////////////////////////////////////////////////////
 /////////////// Authentication - START ///////////////
@@ -162,6 +168,60 @@ async function checkEmergencyAlertStatus() {
 ////////// EmergencyAlert API - END //////////////////
 //////////////////////////////////////////////////////
 
+//////////////////////////////////////////////////////
+///////// Push Notifications - START /////////////////
+//////////////////////////////////////////////////////
+
+// Requests permissions to show notifications.
+async function requestNotificationsPermissions() {
+    console.log('Requesting notifications permissions...');
+    const permission = await Notification.requestPermission();
+
+    if(permission === 'granted') {
+        console.log('Notification permission granted.');
+        // Save my token for fcm messaging to firestore
+        await subscribeToPushNotifications_saveMessagingDeviceToken();
+    } else {
+        console.log('Unable to get permission to notify');
+    }
+}
+
+
+async function subscribeToPushNotifications_saveMessagingDeviceToken() {
+
+    subscribeResponsePElement.textContent = '';
+    try{
+        const currentToken = await getToken(getMessaging());
+        if(currentToken) {
+            console.log('Got FCM device token:', currentToken);
+            const response = await authenticatedRequest(
+                'POST',
+                `${ENDPOINT_URL_ADDRESS}/police-subscribe_save-token`,
+                {
+                    token: currentToken,
+                });
+                console.log('response', response);
+                subscribeResponsePElement.textContent = 'Subscribed successfully.';
+            onMessage(getMessaging(), (message) => {
+                console.log(
+                    'New foreground notification from Firebase Messaging!',
+                    message.notification
+                );
+            });        
+        } else {
+            subscribeResponsePElement.textContent = 'Failed to get fcm device token.';
+            console.log('Could not get FCM device token');
+        }
+        
+    } catch(error) {
+        console.log('Error subscribing to fcm, saving token');
+        throw error;
+    }
+}
+
+//////////////////////////////////////////////////////
+///////// Push Notifications - END /////////////////
+//////////////////////////////////////////////////////
 
 // Shortcuts to DOM Elements.
 var signInButtonElement = document.getElementById('sign-in');
@@ -176,6 +236,9 @@ var responsePElement = document.getElementById('response');
 var checkStatusBtn = document.getElementById('checkStatus');
 var statusPElement = document.getElementById('status');
 
+var subscribePNBtn = document.getElementById('subscribe');
+var subscribeResponsePElement = document.getElementById('subscribeResponse');
+
 
 // Adding Event Listeners
 signInButtonElement.addEventListener('click', signIn);
@@ -184,6 +247,9 @@ signOutButtonElement.addEventListener('click', signOutUser);
 sendEmergencyAlertBtn.addEventListener('click', sendEmergencyAlert);
 
 checkStatusBtn.addEventListener('click', checkEmergencyAlertStatus);
+
+subscribePNBtn.addEventListener('click', requestNotificationsPermissions);
+
 //////////////////////////////////////////////////////
 ////////////////// Main Execution Part ///////////////
 const firebaseApp = initializeApp(getFirebaseConfig());

@@ -15,5 +15,9 @@
       ],
       "region": "europe-central2"
     }
-  ]
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
 }

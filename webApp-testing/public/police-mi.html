@@ -5,6 +5,19 @@
     </head>
     <body>
         <h1><a href="/">EmergencyApp</a> - Police-Mi WebApp</h1>
+        <hr>
+        <!-------------- List EmergencyAlerts ----------------->
+        <button id="fetchEmergencyAlerts">Fetch EmergencyAlerts</button>
+        <ul id="emergencyAlerts">
+            <li>Press the button to fetch all emergencyAlerts.</li>
+        </ul>
+        <!----------------------------------------------------->
+        <hr>
+        <!------------- Subscribe notifications --------------->
+        <button id="subscribe">SUBSCRIBE</button>
+        <span>Subscribe to push notifications, when new emergencyAlert is created or positions are updated.</span>
+        <p id="subscribeResponse"></p>
+        <!----------------------------------------------------->
      <!--This script is created by webpack-->
      <script type="module" src="scripts/police-main.js"></script>
     </body>

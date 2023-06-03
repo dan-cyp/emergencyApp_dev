@@ -1,3 +1,4 @@
+import * as functions from 'firebase-functions';
 import {onRequest} from 'firebase-functions/v1/https'
 
 import { getFirestore } from "firebase-admin/firestore";
@@ -6,16 +7,19 @@ import * as admin from 'firebase-admin';
 admin.initializeApp();
 
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 const app = express();
 app.use(cors());
 
 
 const COLLECTION_FCM_TOKENS_CITIZENS = 'fcmTokens_citizens';
+const COLLECTION_FCM_TOKENS_POLICE = 'fcmTokens_police';
 const COLLECTION_EMERGENCY_ALERTS = 'emergencyAlerts';
 
 
-
+// Serve static files from the public folder
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/hello', (req, res) => {
     res.send('Hello world from daniel');
@@ -78,6 +82,25 @@ app.post('/citizens-subscribe_save-token', async (req:any, res:any) => {
     } catch(error) {
         console.log(error);
         res.sendStatus(500);
+    }
+});
+
+app.post('/police-subscribe_save-token', async (req:any, res:any) => {
+    const {token} = req.body;
+    const userUid = req.user.uid;
+
+    if(token === '' || token === '') {
+        return res.sendStatus(400);
+    }
+
+    try {
+        await getFirestore()
+            .collection(COLLECTION_FCM_TOKENS_POLICE)
+            .add({userUid, token});
+        res.sendStatus(201);
+    } catch(error) {
+        console.log(error);
+        return res.sendStatus(500);
     }
 });
 
@@ -187,4 +210,48 @@ app.get('/emergencyAlerts', async (req, res) => {
     }
 });
 
+// PUSH NOTIFICATION - triggers
+const handleEmergencyAlertsPushNotifications = functions.firestore
+    .document('emergencyAlerts/{emergencyAlertId}')
+    .onCreate(async (snapshot, context) => {
+        console.log('TRIGGERED PUSH NOTIFICATIONS - NEW EMERGENCYALERT CREATED');
+        //const text = 'hello';
+        // const payload = {
+        //     notification: {
+        //         title: 'hello',
+        //         boyd: 'world'
+        //     }
+        // };
+
+        // Get the list of device tokens.
+        const allTokens = await getFirestore().collection('fcmTokens-police').get();
+        const tokens = [];
+        allTokens.forEach((tokenDoc) => {
+            tokens.push(tokenDoc.id);
+        });
+
+        if(tokens.length > 0) {
+            const data = {
+                message: {
+                  token: tokens[0],
+                  notification: {
+                    title: "Notification Title",
+                    body: "Notification Body ",
+                  },
+                  data: {
+                    Nick: "Mario",
+                    Room: "PortugalVSDenmark",
+                  },
+                },
+              };
+            
+             await admin.messaging().send(data.message);
+            // Send notifications to all tokens.
+            /*const reponse = *///await admin.messaging().sendToDevice(tokens, payload);
+            //await cleanupTokens(response, tokens);
+            console.log('Notifications have been send and tokens cleand up');
+        }
+    });
+
 exports.app = onRequest(app);
+exports.sendNotifications = handleEmergencyAlertsPushNotifications;
