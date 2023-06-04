@@ -1,4 +1,4 @@
-import * as functions from 'firebase-functions';
+import { firestore as functions_firestore} from 'firebase-functions';
 import {onRequest} from 'firebase-functions/v1/https'
 
 import { getFirestore } from "firebase-admin/firestore";
@@ -7,23 +7,22 @@ import * as admin from 'firebase-admin';
 admin.initializeApp();
 
 import express from 'express';
+import { Request, Response } from 'express';
 import path from 'path';
 import cors from 'cors';
 const app = express();
 app.use(cors());
 
-
-const COLLECTION_FCM_TOKENS_CITIZENS = 'fcmTokens_citizens';
-const COLLECTION_FCM_TOKENS_POLICE = 'fcmTokens_police';
+// Firestore document collections
 const COLLECTION_EMERGENCY_ALERTS = 'emergencyAlerts';
+// device tokens of citizens app to be able to receive push notifications
+const COLLECTION_FCM_DEVICE_TOKENS_CITIZENS = 'fcmTokens-citizens';
+// device tokens of police app to be able to receive push notifications
+const COLLECTION_FCM_DEVICE_TOKENS_POLICE = 'fcmTokens-police';
 
 
-// Serve static files from the public folder
+// Serve static files from the public folder - openApi docs
 app.use(express.static(path.join(__dirname, '..', 'public')));
-
-app.get('/hello', (req, res) => {
-    res.send('Hello world from daniel');
-});
 
 
 // Express middleware that validates Firebase ID Tokens passed in the Authorization HTTP header.
@@ -53,53 +52,34 @@ const authenticate = async (req:any, res:any, next:any) => {
     }
   };
   
-  app.use(authenticate);
+app.use(authenticate);
 
-// TODO add authentication before processing request
-// TODO add some special token that can be also used such as 1234 - just for testing
+/////////////////////////////////////////////////////////////
+////////////////// EmergencyAlerts - START //////////////////
+/////////////////////////////////////////////////////////////
 
-app.post('/citizens-subscribe_save-token', async (req:any, res:any) => {
-    const { token} = req.body;
-    const uid = req.user.uid;
-    console.log('/citizens-subscribe-save-token', uid, token);
+// GET /emergencyAlerts - Get list of all emergencyAlerts
+app.get('/emergencyAlerts', async (req : Request, res : Response) => {
+    try{
+        const emergencyAlertsRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS);
+        const querySnapshot = await emergencyAlertsRef.get();
 
-    // Sanitize the input
-    if(uid === undefined || token === undefined) {
-        res.sendStatus(400);
-        return;
-    }
+        var docs = [];
 
-    try {
-        // TODO: check if userId is valid
-        // TODO: check if token is valid
+        querySnapshot.forEach((doc) => {
+            try{
+                const documentData = doc.data();
+                documentData.documentId = doc.id;
+                console.log(documentData);
+                docs.push(documentData);
+            } catch(error) {
+                console.error('Error fetching document:', error);
+            }
+        });
 
-
-        // store uid and token into firestore
-        await getFirestore()
-            .collection(COLLECTION_FCM_TOKENS_CITIZENS)
-            .add({uid, token});
-        res.sendStatus(201);
+        return res.send(docs);
     } catch(error) {
-        console.log(error);
-        res.sendStatus(500);
-    }
-});
-
-app.post('/police-subscribe_save-token', async (req:any, res:any) => {
-    const {token} = req.body;
-    const userUid = req.user.uid;
-
-    if(token === '' || token === '') {
-        return res.sendStatus(400);
-    }
-
-    try {
-        await getFirestore()
-            .collection(COLLECTION_FCM_TOKENS_POLICE)
-            .add({userUid, token});
-        res.sendStatus(201);
-    } catch(error) {
-        console.log(error);
+        console.error(error);
         return res.sendStatus(500);
     }
 });
@@ -192,39 +172,109 @@ app.get('/emergencyAlerts/latest/:citizenId', async (req, res) => {
     }
 });
 
-app.get('/emergencyAlerts', async (req, res) => {
+app.post('/emergencyAlerts-confirm', async (req, res) => {
+    const { uid, status } = req.body;
+    // TODO: check if valid format
+    // Sanitize the input
+    if(uid === undefined || uid === '') {
+        return res.sendStatus(400);
+    }
     try{
-        const emergencyAlertsRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS);
-        const querySnapshot = await emergencyAlertsRef.get();
+        // TODO: implement 404
+        const docRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS).doc(uid);
+        await docRef.update({status: status});
+        console.log('Document updated successfully');
+        return res.sendStatus(200);
+    }catch(error) {
+        console.log(error);
+        return res.sendStatus(500);
+    }
+});
 
-        let docs = [];
+/////////////////////////////////////////////////////////////
+////////////////// EmergencyAlerts - END //////////////////
+/////////////////////////////////////////////////////////////
 
-        querySnapshot.forEach((doc) => {
-            const documentData = doc.data();
-            docs.push(documentData);
+////////////////////////////////////////////////
+/////////// PUSH NOTIFICATIONS /////////////////
+////////////////////////////////////////////////
+
+// endpoint for citizens to subscribe to poush notifications.
+// Save their device token to the firestore,
+// so they can receive notifications on relevant changes in firestore
+app.post('/citizens-subscribe', async (req:any, res:any) => {
+    const { token} = req.body;
+    const uid = req.user.uid;
+    console.log('/citizens-subscribe-save-token', uid, token);
+
+    // Sanitize the input
+    if(uid === undefined || token === undefined) {
+        res.sendStatus(400);
+        return;
+    }
+
+    try {
+        // TODO: check if userId is valid
+        // TODO: check if token is valid
+
+
+        // store uid and token into firestore
+        const docRef = await getFirestore()
+            .collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS)
+            .doc(token);
+        await docRef.set({
+            userUid: uid
         });
-        return res.send(docs);
+        res.sendStatus(201);
+    } catch(error) {
+        console.log(error);
+        res.sendStatus(500);
+    }
+});
+
+// endpoint for police to subscribe to push notifications.
+// Save their device token to the firestore
+// so they can receive notifications on relevant firestore changes
+app.post('/police-subscribe', async (req:any, res:any) => {
+    const userUid = req.user.uid;
+    const {token} = req.body;
+
+    // sanitize input
+    // TODO: verify that it is valid device token first
+    if(token === undefined || token === '') {
+        return res.sendStatus(400);
+    }
+
+    try {
+        const docRef = await getFirestore()
+            .collection(COLLECTION_FCM_DEVICE_TOKENS_POLICE)
+            .doc(token);
+        await docRef.set({
+            userUid
+        })
+        res.sendStatus(201);
     } catch(error) {
         console.log(error);
         return res.sendStatus(500);
     }
 });
 
-// PUSH NOTIFICATION - triggers
-const handleEmergencyAlertsPushNotifications = functions.firestore
+
+//////////////////////////////////////////////////////
+// Firestore Triggers w Push Notifications - START ///
+//////////////////////////////////////////////////////
+
+// Send push notifications to police applications, whenever new emergencyEvent is created.
+const handleEmergencyAlertsPushNotifications = functions_firestore
     .document('emergencyAlerts/{emergencyAlertId}')
     .onCreate(async (snapshot, context) => {
         console.log('TRIGGERED PUSH NOTIFICATIONS - NEW EMERGENCYALERT CREATED');
-        //const text = 'hello';
-        // const payload = {
-        //     notification: {
-        //         title: 'hello',
-        //         boyd: 'world'
-        //     }
-        // };
+        const emergencyAlertId = snapshot.id;
+        const emergencyAlertData = snapshot.data();
+        console.log("Data from PN", emergencyAlertId, emergencyAlertData);
 
         // Get the list of device tokens.
-        const allTokens = await getFirestore().collection('fcmTokens-police').get();
+        const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_POLICE).get();
         const tokens = [];
         allTokens.forEach((tokenDoc) => {
             tokens.push(tokenDoc.id);
@@ -235,23 +285,56 @@ const handleEmergencyAlertsPushNotifications = functions.firestore
                 message: {
                   token: tokens[0],
                   notification: {
-                    title: "Notification Title",
-                    body: "Notification Body ",
-                  },
-                  data: {
-                    Nick: "Mario",
-                    Room: "PortugalVSDenmark",
-                  },
+                    title: emergencyAlertId,
+                    body: JSON.stringify(emergencyAlertData),
+                  }
                 },
               };
             
-             await admin.messaging().send(data.message);
+            await admin.messaging().send(data.message);
             // Send notifications to all tokens.
-            /*const reponse = *///await admin.messaging().sendToDevice(tokens, payload);
             //await cleanupTokens(response, tokens);
             console.log('Notifications have been send and tokens cleand up');
         }
     });
 
+// Send push notification to citizens applications, whenever it's status changes
+const handleEmergencAlertStatusChange = functions_firestore
+    .document(`${COLLECTION_EMERGENCY_ALERTS}/{documentId}`)
+    .onUpdate(async (change, context) => {
+        const prevValue = change.before.data();
+        const newValue = change.after.data();
+        const emergencyAlertId = change.before.id;
+        const newStatusResponse = `${prevValue.status} -> ${newValue.status}`;
+
+
+        if(newValue.status !== prevValue.status) {
+            // Get the list of device tokens.
+            const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS).get();
+            const tokens = [];
+            allTokens.forEach((tokenDoc) => {
+                tokens.push(tokenDoc.id);
+            });
+
+
+            if(tokens.length > 0) {
+                const data = {
+                    message: {
+                        token: tokens[0],
+                        notification: {
+                            title: emergencyAlertId,
+                            body: newStatusResponse
+                        }
+                    }
+                };
+
+                await admin.messaging().send(data.message);
+                //await cleanupTokens(response, tokens);
+                console.log('Notifications have been send and tokens cleand up');
+            }
+        }
+    });
+
 exports.app = onRequest(app);
 exports.sendNotifications = handleEmergencyAlertsPushNotifications;
+exports.handleStatusChange = handleEmergencAlertStatusChange;

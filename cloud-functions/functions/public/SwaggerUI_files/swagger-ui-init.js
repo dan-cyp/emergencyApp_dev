@@ -12,18 +12,40 @@ window.onload = function() {
     "openapi": "3.0.3",
     "info": {
       "title": "EmergencyApp API",
-      "description": "API for managing Emergency Alerts",
+      "description": "API for creating/updating Emergency Alerts and managing Citiznes and Police application clients.",
       "version": "1.0.0"
     },
+    "tags": [
+      {
+        "name": "emergencyAlerts",
+        "description": "Creating and retrieving information about EmergencyAlerts"
+      },
+      {
+        "name": "fcm-subscription",
+        "description": "Saving device's tokens for Firebase Cloud Messaging - Push Notification"
+      }
+    ],
     "servers": [
       {
-        "url": "https://localhost:5001/emergencyapp-development/us-central1/app"
+        "url": "http://localhost:5001/emergencyapp-development/us-central1/app"
+      },
+      {
+        "url": "https://us-central1-emergencyapp-development.cloudfunctions.net/app"
       }
     ],
     "paths": {
       "/emergencyAlerts": {
         "post": {
-          "summary": "Create a new Emergency Alert",
+          "tags": [
+            "emergencyAlerts"
+          ],
+          "summary": "Create/Update EmergencyAlert",
+          "description": "Create new EmergencyAlert or update positions array of existing one if not marked as finished.",
+          "security": [
+            {
+              "HTTPBearerAuth": []
+            }
+          ],
           "requestBody": {
             "description": "JSON object containing latitude, longitude, and createdAt timestamp",
             "required": true,
@@ -59,7 +81,7 @@ window.onload = function() {
               }
             },
             "201": {
-              "description": "Success, new EmergencyAlert created",
+              "description": "Created, new EmergencyAlert created",
               "content": {
                 "application/json": {
                   "schema": {
@@ -74,13 +96,25 @@ window.onload = function() {
             "401": {
               "description": "Unauthorized - Authentication credentials are missing or invalid"
             },
+            "403": {
+              "description": "Forbiden - not sufficient permissions"
+            },
             "500": {
               "description": "Internal Server error"
             }
           }
         },
         "get": {
+          "tags": [
+            "emergencyAlerts"
+          ],
           "summary": "Get a list of all Emergency Alerts",
+          "description": "This method should be used by Police client application to fetch all emergencyAlerts for example on start up.",
+          "security": [
+            {
+              "HTTPBearerAuth": []
+            }
+          ],
           "responses": {
             "200": {
               "description": "Successful operation",
@@ -98,6 +132,9 @@ window.onload = function() {
             "401": {
               "description": "Unauthorized - Authentication credentials are missing or invalid"
             },
+            "403": {
+              "description": "Forbiden - not sufficient permissions"
+            },
             "500": {
               "description": "Internal Server error"
             }
@@ -106,7 +143,16 @@ window.onload = function() {
       },
       "/emergencyAlerts/latest/{citizenId}": {
         "get": {
+          "tags": [
+            "emergencyAlerts"
+          ],
           "summary": "Get the latest emergency alert for a citizen",
+          "description": "description",
+          "security": [
+            {
+              "HTTPBearerAuth": []
+            }
+          ],
           "parameters": [
             {
               "name": "citizenId",
@@ -132,14 +178,124 @@ window.onload = function() {
             "401": {
               "description": "Unauthorized - Authentication credentials are missing or invalid"
             },
+            "403": {
+              "description": "Forbiden - not sufficient permissions"
+            },
             "500": {
               "description": "Internal Server error"
+            }
+          }
+        }
+      },
+      "/citizen-subscribe": {
+        "post": {
+          "tags": [
+            "fcm-subscription"
+          ],
+          "summary": "Citizen subscribes to FCM - push notifications",
+          "description": "Citizen can subscribe to Firebase Cloud Messaging by saving his device token to the database. Afterwards he can receive push notifications when the status of his emergencyAlert changes",
+          "security": [
+            {
+              "HTTPBearerAuth": []
+            }
+          ],
+          "requestBody": {
+            "description": "JSON object containing device token",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deviceToken": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success, citizens device token saved successfully"
+            },
+            "201": {
+              "description": "success, citizens device token saved successfully"
+            },
+            "400": {
+              "description": "Invalid request"
+            },
+            "401": {
+              "description": "Unauthorized - Authentication credentials are missing or invalid"
+            },
+            "403": {
+              "description": "Forbiden - insufficient permissions"
+            },
+            "500": {
+              "description": "Internal server error"
+            }
+          }
+        }
+      },
+      "/police-subscribe": {
+        "post": {
+          "tags": [
+            "fcm-subscription"
+          ],
+          "summary": "Police subscribes to FCM - push notifications",
+          "description": "Police can subscribe to Firebase Cloud Messaging by saving his device token to the database. Afterwards he can receive push notifications when new EmergencyAlert created or updated its positoins",
+          "security": [
+            {
+              "HTTPBearerAuth": []
+            }
+          ],
+          "requestBody": {
+            "description": "JSON object containing device token",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deviceToken": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success, citizens device token saved successfully"
+            },
+            "201": {
+              "description": "success, citizens device token saved successfully"
+            },
+            "400": {
+              "description": "Invalid request"
+            },
+            "401": {
+              "description": "Unauthorized - Authentication credentials are missing or invalid"
+            },
+            "403": {
+              "description": "Forbiden - insufficient permissions"
+            },
+            "500": {
+              "description": "Internal server error"
             }
           }
         }
       }
     },
     "components": {
+      "securitySchemes": {
+        "HTTPBearerAuth": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT"
+        }
+      },
       "schemas": {
         "EmergencyAlert": {
           "type": "object",
@@ -201,8 +357,7 @@ window.onload = function() {
           }
         }
       }
-    },
-    "tags": []
+    }
   },
   "customOptions": {}
 };

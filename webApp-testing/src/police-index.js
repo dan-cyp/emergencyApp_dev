@@ -51,7 +51,7 @@ async function getAllEmergencyAlerts() {
     emergencyAlertsUList.innerHTML = `<li>waiting for response...</li>`;
     // set li in ul to waiting
     try {
-        const response = await authenticatedRequest('GET', `${ENDPOINT_URL_ADDRESS}/emergencyAlerts`)
+        const response = await authenticatedRequest('GET', `${ENDPOINT_URL_ADDRESS}/emergencyAlerts`);
         console.log('response', response);
         const responseText = await response.text();
         console.log(responseText);
@@ -65,10 +65,37 @@ async function getAllEmergencyAlerts() {
 function _generateListItems(elementsArray) {
     let ul = '';
     elementsArray.forEach(element => {
-        ul += `<li>${JSON.stringify(element)}</li>`
+        ul += _generateListItem(element);
     });
     return ul;
 }
+
+function _generateListItem(element) {
+    return `
+        <li>
+            ${JSON.stringify(element)}
+            <button onclick="confirmEmergencyAlert('${element.documentId}', 'confirmed')">Confirm</button>
+            <button onclick="confirmEmergencyAlert('${element.documentId}', 'finished')">Finish him</button>
+        </li>`
+}
+
+async function _confirmEmergencyAlert(uid, statusValue) {
+    console.log("Confirming emergencyAlert with uid",uid);
+    try{
+        const response = await authenticatedRequest('POST', 
+        `${ENDPOINT_URL_ADDRESS}/emergencyAlerts-confirm`,
+        {
+            uid: uid,
+            status: statusValue
+        });
+        console.log('response', response);
+    } catch(error){
+        console.log('Error confirming EmergencyAlert: ', error);
+        throw error;
+    }
+}
+// make sure that the function is accessible in the browser
+window.confirmEmergencyAlert = _confirmEmergencyAlert;
 
 async function subscribeToPushNotifications_saveMessagingDeviceToken() {
 
@@ -79,7 +106,7 @@ async function subscribeToPushNotifications_saveMessagingDeviceToken() {
             console.log('Got FCM device token:', currentToken);
             const response = await authenticatedRequest(
                 'POST',
-                `${ENDPOINT_URL_ADDRESS}/police-subscribe_save-token`,
+                `${ENDPOINT_URL_ADDRESS}/police-subscribe`,
                 {
                     token: currentToken,
                 });
@@ -90,7 +117,11 @@ async function subscribeToPushNotifications_saveMessagingDeviceToken() {
                     'New foreground notification from Firebase Messaging!',
                     message.notification
                 );
-            });        
+            // Append to UList <li> element with received data
+            // append documentId to the message which is in title
+            message.notification.documentId = message.notification.title;
+            emergencyAlertsUList.innerHTML += _generateListItem(message.notification);
+        });        
         } else {
             subscribeResponsePElement.textContent = 'Failed to get fcm device token.';
             console.log('Could not get FCM device token');
@@ -100,7 +131,7 @@ async function subscribeToPushNotifications_saveMessagingDeviceToken() {
         console.log('Error subscribing to fcm, saving token');
         throw error;
     }
-}
+} 
 //////////////////////////////////////////////////////
 ////////// EmergencyAlert API - END //////////////////
 //////////////////////////////////////////////////////

@@ -196,7 +196,7 @@ async function subscribeToPushNotifications_saveMessagingDeviceToken() {
             console.log('Got FCM device token:', currentToken);
             const response = await authenticatedRequest(
                 'POST',
-                `${ENDPOINT_URL_ADDRESS}/police-subscribe_save-token`,
+                `${ENDPOINT_URL_ADDRESS}/citizens-subscribe`,
                 {
                     token: currentToken,
                 });
@@ -207,6 +207,7 @@ async function subscribeToPushNotifications_saveMessagingDeviceToken() {
                     'New foreground notification from Firebase Messaging!',
                     message.notification
                 );
+                notificationsUListElement.innerHTML += `<li>${message.notification.body}</li>`
             });        
         } else {
             subscribeResponsePElement.textContent = 'Failed to get fcm device token.';
@@ -239,6 +240,7 @@ var statusPElement = document.getElementById('status');
 var subscribePNBtn = document.getElementById('subscribe');
 var subscribeResponsePElement = document.getElementById('subscribeResponse');
 
+var notificationsUListElement = document.getElementById('notifications');
 
 // Adding Event Listeners
 signInButtonElement.addEventListener('click', signIn);
