@@ -30,7 +30,7 @@ window.onload = function() {
         "url": "http://localhost:5001/emergencyapp-development/us-central1/app"
       },
       {
-        "url": "https://us-central1-emergencyapp-development.cloudfunctions.net/app"
+        "url": "https://us-central1-emergency-app-1bd62.cloudfunctions.net/app"
       }
     ],
     "paths": {

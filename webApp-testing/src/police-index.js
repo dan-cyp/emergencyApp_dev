@@ -83,9 +83,8 @@ async function _confirmEmergencyAlert(uid, statusValue) {
     console.log("Confirming emergencyAlert with uid",uid);
     try{
         const response = await authenticatedRequest('POST', 
-        `${ENDPOINT_URL_ADDRESS}/emergencyAlerts-confirm`,
+        `${ENDPOINT_URL_ADDRESS}/emergencyAlerts/${uid}/confirm`,
         {
-            uid: uid,
             status: statusValue
         });
         console.log('response', response);

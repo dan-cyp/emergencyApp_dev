@@ -200,12 +200,12 @@ app.get('/emergencyAlerts/latest/:citizenId', async (req : Request, res : Respon
 
 app.post('/emergencyAlerts/:uid/confirm', async (req: Request, res: Response) => {
     try{
-
-        const { uid, status } = req.body;
+        const { uid } = req.params;
+        const { status } = req.body;
 
         // TODO: check if valid format
         // Sanitize the input
-        if(!uid || uid !== 'string') {
+        if(!uid) {
             return res.sendStatus(400);
         }
 
@@ -234,16 +234,16 @@ app.post('/emergencyAlerts/:uid/confirm', async (req: Request, res: Response) =>
 /////////// PUSH NOTIFICATIONS /////////////////
 ////////////////////////////////////////////////
 
-// endpoint for citizens to subscribe to poush notifications.
+// endpoint for citizens to subscribe to push notifications.
 // Save their device token to the firestore,
 // so they can receive notifications on relevant changes in firestore
-app.post('/citizens-subscribe', async (req:any, res:any) => {
-    const { token} = req.body;
+app.post('/citizens-subscribe', async (req:CustomRequest, res:Response) => {
     const uid = req.user.uid;
+    const { token} = req.body;
     console.log('/citizens-subscribe-save-token', uid, token);
 
     // Sanitize the input
-    if(uid === undefined || token === undefined) {
+    if(!uid || !token ) {
         res.sendStatus(400);
         return;
     }
@@ -308,29 +308,53 @@ const handleEmergencyAlertsPushNotifications = functions_firestore
         const emergencyAlertData = snapshot.data();
         console.log("Data from PN", emergencyAlertId, emergencyAlertData);
 
-        // Get the list of device tokens.
         const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_POLICE).get();
-        const tokens = [];
-        allTokens.forEach((tokenDoc) => {
-            tokens.push(tokenDoc.id);
-        });
+        const tokenDocs = allTokens.docs;
+        const tokens: string[] = tokenDocs.map((tokenDoc) => tokenDoc.id);
 
         if(tokens.length > 0) {
-            const data = {
-                message: {
-                  token: tokens[0],
-                  notification: {
-                    title: emergencyAlertId,
-                    body: JSON.stringify(emergencyAlertData),
-                  }
-                },
-              };
+            tokens.forEach(async (token) => {
+                const data = {
+                    message: {
+                        token: token,
+                        notification: {
+                            title: emergencyAlertId,
+                            body: JSON.stringify(emergencyAlertData)
+                        }
+                    }
+                }
+                try {
+                    await admin.messaging().send(data.message);
+                } catch(error: any) {
+                    console.error(error);
+                }
+
+            });
             
-            await admin.messaging().send(data.message);
-            // Send notifications to all tokens.
-            //await cleanupTokens(response, tokens);
-            console.log('Notifications have been send and tokens cleand up');
-        }
+        };
+        // // Get the list of device tokens.
+        // const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_POLICE).get();
+        // const tokens = [];
+        // allTokens.forEach((tokenDoc) => {
+        //     tokens.push(tokenDoc.id);
+        // });
+
+        // if(tokens.length > 0) {
+        //     const data = {
+        //         message: {
+        //           token: tokens[0],
+        //           notification: {
+        //             title: emergencyAlertId,
+        //             body: JSON.stringify(emergencyAlertData),
+        //           }
+        //         },
+        //       };
+            
+        //     await admin.messaging().send(data.message);
+        //     // Send notifications to all tokens.
+        //     //await cleanupTokens(response, tokens);
+        //     console.log('Notifications have been send and tokens cleand up');
+        // }
     });
 
 // Send push notification to citizens applications, whenever it's status changes
@@ -344,29 +368,52 @@ const handleEmergencAlertStatusChange = functions_firestore
 
 
         if(newValue.status !== prevValue.status) {
-            // Get the list of device tokens.
+
             const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS).get();
-            const tokens = [];
-            allTokens.forEach((tokenDoc) => {
-                tokens.push(tokenDoc.id);
-            });
+            const tokenDocs = allTokens.docs;
+            const tokens: string[] = tokenDocs.map((tokenDoc) => tokenDoc.id);
 
-
-            if(tokens.length > 0) {
-                const data = {
-                    message: {
-                        token: tokens[0],
-                        notification: {
-                            title: emergencyAlertId,
-                            body: newStatusResponse
+            if(tokens.length > 0){
+                tokens.forEach(async (token) => {
+                    const data = {
+                        message: {
+                            token: token,
+                            notification: {
+                                title: emergencyAlertId,
+                                body: newStatusResponse
+                            }
                         }
                     }
-                };
+                    try{
+                        await admin.messaging().send(data.message);
+                    } catch(error:any) {
+                        console.error(error);
+                    }       
+                });
+            }   
+            // // Get the list of device tokens.
+            // const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS).get();
+            // const tokens = [];
+            // allTokens.forEach((tokenDoc) => {
+            //     tokens.push(tokenDoc.id);
+            // });
 
-                await admin.messaging().send(data.message);
-                //await cleanupTokens(response, tokens);
-                console.log('Notifications have been send and tokens cleand up');
-            }
+
+            // if(tokens.length > 0) {
+            //     const data = {
+            //         message: {
+            //             token: tokens[0],
+            //             notification: {
+            //                 title: emergencyAlertId,
+            //                 body: newStatusResponse
+            //             }
+            //         }
+            //     };
+
+            //     await admin.messaging().send(data.message);
+            //     //await cleanupTokens(response, tokens);
+            //     console.log('Notifications have been send and tokens cleand up');
+            // }
         }
     });
 
