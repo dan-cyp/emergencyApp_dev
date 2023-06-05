@@ -20,10 +20,24 @@ const COLLECTION_FCM_DEVICE_TOKENS_CITIZENS = 'fcmTokens-citizens';
 // device tokens of police app to be able to receive push notifications
 const COLLECTION_FCM_DEVICE_TOKENS_POLICE = 'fcmTokens-police';
 
+interface EmergencyAlertData {
+    lat: number,
+    lng: number,
+    createdAt: string
+}
+
+interface CustomRequest extends Request {
+    user: {
+        uid: string
+    };
+}
 
 // Serve static files from the public folder - openApi docs
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+/////////////////////////////////////////////////////////////
+////////////////// Authentication - START ///////////////////
+/////////////////////////////////////////////////////////////
 
 // Express middleware that validates Firebase ID Tokens passed in the Authorization HTTP header.
 // The Firebase ID token needs to be passed as a Bearer token in the Authorization HTTP header like this:
@@ -55,6 +69,10 @@ const authenticate = async (req:any, res:any, next:any) => {
 app.use(authenticate);
 
 /////////////////////////////////////////////////////////////
+////////////////// Authentication - END /////////////////////
+/////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////
 ////////////////// EmergencyAlerts - START //////////////////
 /////////////////////////////////////////////////////////////
 
@@ -84,64 +102,72 @@ app.get('/emergencyAlerts', async (req : Request, res : Response) => {
     }
 });
 
-app.post('/emergencyAlerts', async (req:any, res:any) => {
-    // TODO: change uid to ge it from the authentication as userId
-    const {lat, lng, createdAt} = req.body;
-    const uid = req.user.uid;
-    console.log('/emergencyAlert', JSON.stringify(req.body));
+// Create new emergencyAlert or Update existing one with new position in 
+// poss field in case alert has not been resolved yet.
+app.post('/emergencyAlerts', async (req:CustomRequest, res:Response) => {
 
-    // Sanitize the input
-    if(uid === undefined || lat === undefined || lng === undefined || createdAt === undefined) {
-        res.sendStatus(400);
-        return;
-    }
     try{
+        const {lat, lng, createdAt} : EmergencyAlertData = req.body;
+        const userId = req.user.uid;
+        console.log('/emergencyAlert', JSON.stringify(req.body));
+
+        // Sanitize the input
+        if(!userId || !lat || !lng || !createdAt) {
+            return res.sendStatus(400);
+        }
+
         // TODO: check that uid, lat, lng and createdAt are valid data)
 
-        // TODO: change to userId
         // Get latest emergencyAlert
-        const querySnapshot = await getFirestore()
-            .collection(COLLECTION_EMERGENCY_ALERTS)
-            .where('uid', '==', uid)
+        const emergencyAlertsRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS);
+        const querySnapshot = await emergencyAlertsRef
+            .where('userId', '==', userId)
             .orderBy('createdAt', 'desc')
             .limit(1)
             .get();
+
         if(querySnapshot.empty) {
             // create new emergencyAlert
-            await getFirestore()
-                .collection(COLLECTION_EMERGENCY_ALERTS)
-                .add({uid, poss: [{lat, lng }], createdAt, status: 'created'});
-            res.status(201).send({status: 'created'});
-            return;
-        } else {
-            const document = querySnapshot.docs[0].data();
-            const status = document.status;
-            if(status === 'finished') {
-                await getFirestore()
-                    .collection(COLLECTION_EMERGENCY_ALERTS)
-                    .add({uid, poss: [{lat, lng }], createdAt, status: 'created'});
-                res.status(201).send({status: 'created'});
-                return
-            } else {
-                const documentRef = querySnapshot.docs[0].ref;
-                const document = querySnapshot.docs[0].data();
-                documentRef.update({poss: [...document.poss, {lat, lng}]});
-                res.status(200).send({status: document.status});
-                return;
-            }
+            await emergencyAlertsRef.add({
+                userId: userId,
+                poss: [{lat, lng }], 
+                createdAt, 
+                status: 'created'
+            });
+            return res.status(201).send({status: 'created'});
         }
+        const latestDocument = querySnapshot.docs[0];
+        const latestStatus = latestDocument.data().status;
+
+        if(latestStatus === 'finished') {
+            await emergencyAlertsRef.add({
+                userId: userId, 
+                poss: [{lat, lng }], 
+                createdAt, 
+                status: 'created'
+            });
+            return res.status(201).send({status: 'created'});
+        }
+
+        const documentRef = latestDocument.ref;
+        const documentData = latestDocument.data();
+        const updatedPoss = [...documentData.poss, {lat, lng}];
+
+        await documentRef.update({poss: updatedPoss});
+
+        return res.status(200).send({status: documentData.status});
     } catch(error) {
         console.log(error);
-        res.sendStatus(500);
+        return res.sendStatus(500);
     }
-
 });
 
-app.get('/emergencyAlerts/latest/:citizenId', async (req, res) => {
-    const citizenId = req.params.citizenId;
+// Get status of the latest opened EmergencyAlert for specified citizen.
+app.get('/emergencyAlerts/latest/:citizenId', async (req : Request, res : Response) => {
+    const { citizenId } = req.params;
 
     // sanitize the input
-    if(citizenId === undefined || citizenId === '') {
+    if(!citizenId) {
         return res.sendStatus(400);
     }
 
@@ -162,31 +188,40 @@ app.get('/emergencyAlerts/latest/:citizenId', async (req, res) => {
         // Get the first (latest) document from the query result
         const document = querySnapshot.docs[0].data();
         // Access the desired fields from the document
-        const status = document.status;
+        const { status } = document;
 
         return res.send({status});
         
     } catch(error) {
-        console.log(error);
+        console.error(error);
         return res.sendStatus(500);
     }
 });
 
-app.post('/emergencyAlerts-confirm', async (req, res) => {
-    const { uid, status } = req.body;
-    // TODO: check if valid format
-    // Sanitize the input
-    if(uid === undefined || uid === '') {
-        return res.sendStatus(400);
-    }
+app.post('/emergencyAlerts/:uid/confirm', async (req: Request, res: Response) => {
     try{
-        // TODO: implement 404
+
+        const { uid, status } = req.body;
+
+        // TODO: check if valid format
+        // Sanitize the input
+        if(!uid || uid !== 'string') {
+            return res.sendStatus(400);
+        }
+
         const docRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS).doc(uid);
-        await docRef.update({status: status});
+        const document = await docRef.get();
+
+        if(!document.exists) {
+            return res.sendStatus(404); // No matching document found
+        }
+
+        await docRef.update({status});
+
         console.log('Document updated successfully');
         return res.sendStatus(200);
     }catch(error) {
-        console.log(error);
+        console.error(error);
         return res.sendStatus(500);
     }
 });
