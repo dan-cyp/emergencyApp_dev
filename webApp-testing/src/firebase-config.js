@@ -7,18 +7,18 @@
  * 4. Copy the config object snippet, then add it here.
  */
 const config = {
-    apiKey: "AIzaSyB6bQ_IaFGyN9121OIDSwS8TWd1WbzQE4c",
+  apiKey: "AIzaSyBdiS5gCYLjuW9hkRUnkZw9LkgN-6j9-jk",
 
-    authDomain: "emergencyapp-development.firebaseapp.com",
-  
-    projectId: "emergencyapp-development",
-  
-    storageBucket: "emergencyapp-development.appspot.com",
-  
-    messagingSenderId: "161695873894",
-  
-    appId: "1:161695873894:web:4d3222985ba99f61d226a7"
-  
+  authDomain: "emergency-app-1bd62.firebaseapp.com",
+
+  projectId: "emergency-app-1bd62",
+
+  storageBucket: "emergency-app-1bd62.appspot.com",
+
+  messagingSenderId: "10930579171",
+
+  appId: "1:10930579171:web:2b0e5d644cbcad71b147d6"
+
   };
   
   export function getFirebaseConfig() {

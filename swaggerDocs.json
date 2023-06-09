@@ -13,6 +13,10 @@
     {
       "name": "fcm-subscription",
       "description": "Saving device's tokens for Firebase Cloud Messaging - Push Notification"
+    },
+    {
+      "name": "citizens",
+      "description": "Information regarding Citizens"
     }
   ],
   "servers": [
@@ -227,56 +231,55 @@
         }
       }
     },
-    "/police-subscribe": {
-      "post": {
+    "/citizens/{citizenId}": {
+      "get": {
         "tags": [
-          "fcm-subscription"
+          "citizens"
         ],
-        "summary": "Police subscribes to FCM - push notifications",
-        "description": "Police can subscribe to Firebase Cloud Messaging by saving his device token to the database. Afterwards he can receive push notifications when new EmergencyAlert created or updated its positoins",
+        "summary": "Get citizens information",
+        "description": "Get information about citizen based on citizendId",
         "security": [
           {
             "HTTPBearerAuth": []
           }
         ],
-        "requestBody": {
-          "description": "JSON object containing device token",
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "deviceToken": {
-                    "type": "string"
-                  }
+        "parameters": [
+          {
+            "name": "citizenId",
+            "in": "path",
+            "description": "uid of the citizen",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Citizen"
                 }
               }
             }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success, citizens device token saved successfully"
-          },
-          "201": {
-            "description": "success, citizens device token saved successfully"
-          },
-          "400": {
-            "description": "Invalid request"
           },
           "401": {
             "description": "Unauthorized - Authentication credentials are missing or invalid"
           },
           "403": {
-            "description": "Forbiden - insufficient permissions"
+            "description": "Forbiden - not sufficient permissions"
+          },
+          "404": {
+            "description": "Not Found - citizen with specified uid not found"
           },
           "500": {
-            "description": "Internal server error"
+            "description": "Internal Server error"
           }
         }
       }
-    }
+    },
   },
   "components": {
     "securitySchemes": {
@@ -343,6 +346,17 @@
           "receivedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "Citizen": {
+        "type": "object",
+        "properties": {
+          "uid": {
+            "type": "string"
+          },
+          "phoneNo": {
+            "type": "string"
           }
         }
       }

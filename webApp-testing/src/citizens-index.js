@@ -6,6 +6,7 @@ import {
     onAuthStateChanged, 
     GoogleAuthProvider, 
     signInWithPopup, 
+    signInWithEmailAndPassword,
     signOut 
 } from 'firebase/auth';
 
@@ -24,8 +25,25 @@ const ENDPOINT_URL_ADDRESS = 'http://localhost:5001/emergencyapp-development/us-
 // Citizen Signs-in via Google account
 async function signIn() {
     // Sign in Firebase using popup auth and Google as the identity provider.
-    var provider = new GoogleAuthProvider();
-    await signInWithPopup(getAuth(), provider);
+    //var provider = new GoogleAuthProvider();
+    //await signInWithPopup(getAuth(), provider);
+    var email = prompt("Enter your email:");
+  var password = prompt("Enter your password:");
+
+    console.log(email, password);
+
+  const auth = getAuth();
+signInWithEmailAndPassword(auth, email, password)
+  .then((userCredential) => {
+    // Signed in 
+    const user = userCredential.user;
+    // ...
+  })
+  .catch((error) => {
+    const errorCode = error.code;
+    const errorMessage = error.message;
+    console.log(errorCode, errorMessage);
+  });
 }
 
 async function signOutUser() {

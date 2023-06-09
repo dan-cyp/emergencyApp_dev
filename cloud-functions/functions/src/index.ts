@@ -18,7 +18,8 @@ const COLLECTION_EMERGENCY_ALERTS = 'emergencyAlerts';
 // device tokens of citizens app to be able to receive push notifications
 const COLLECTION_FCM_DEVICE_TOKENS_CITIZENS = 'fcmTokens-citizens';
 // device tokens of police app to be able to receive push notifications
-const COLLECTION_FCM_DEVICE_TOKENS_POLICE = 'fcmTokens-police';
+//const COLLECTION_FCM_DEVICE_TOKENS_POLICE = 'fcmTokens-police';
+const COLLECTION_POLICE_LOGIN = 'police-login';
 
 interface EmergencyAlertData {
     lat: number,
@@ -43,30 +44,36 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // The Firebase ID token needs to be passed as a Bearer token in the Authorization HTTP header like this:
 // `Authorization: Bearer <Firebase ID Token>`.
 // when decoded successfully, the ID Token content will be added as `req.user`.
-const authenticate = async (req:any, res:any, next:any) => {
-    if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
-      res.status(403).send('Unauthorized');
-      return;
-    }
-    const idToken = req.headers.authorization.split('Bearer ')[1];
-    try {
-        // Cheat to test with 1234 and 4321 tokens
-        if(idToken == '1234') {
-            req.user = {uid: '4321'};
-            next();
-            return;
-        }
-      const decodedIdToken = await admin.auth().verifyIdToken(idToken);
-      req.user = decodedIdToken;
-      next();
-      return;
-    } catch(e) {
-      res.status(403).send('Unauthorized');
-      return;
-    }
-  };
+// const authenticate = async (req:CustomRequest, res:Response, next:any) => {
+//     // Specify paths that do not need authentication
+//     if(req.path === '/police-login') {
+//         next();
+//         return;
+//     }
+
+//     if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
+//       res.status(403).send('Unauthorized');
+//       return;
+//     }
+//     const idToken = req.headers.authorization.split('Bearer ')[1];
+//     try {
+//         // Cheat to test with 1234 and 4321 tokens
+//         if(idToken == '1234') {
+//             req.user = {uid: '4321'};
+//             next();
+//             return;
+//         }
+//       const decodedIdToken = await admin.auth().verifyIdToken(idToken);
+//       req.user = decodedIdToken;
+//       next();
+//       return;
+//     } catch(e) {
+//       res.status(403).send('Unauthorized');
+//       return;
+//     }
+//   };
   
-app.use(authenticate);
+//  app.use(authenticate);
 
 /////////////////////////////////////////////////////////////
 ////////////////// Authentication - END /////////////////////
@@ -77,30 +84,30 @@ app.use(authenticate);
 /////////////////////////////////////////////////////////////
 
 // GET /emergencyAlerts - Get list of all emergencyAlerts
-app.get('/emergencyAlerts', async (req : Request, res : Response) => {
-    try{
-        const emergencyAlertsRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS);
-        const querySnapshot = await emergencyAlertsRef.get();
+// app.get('/emergencyAlerts', async (req : Request, res : Response) => {
+//     try{
+//         const emergencyAlertsRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS);
+//         const querySnapshot = await emergencyAlertsRef.get();
 
-        var docs = [];
+//         var docs = [];
 
-        querySnapshot.forEach((doc) => {
-            try{
-                const documentData = doc.data();
-                documentData.documentId = doc.id;
-                console.log(documentData);
-                docs.push(documentData);
-            } catch(error) {
-                console.error('Error fetching document:', error);
-            }
-        });
+//         querySnapshot.forEach((doc) => {
+//             try{
+//                 const documentData = doc.data();
+//                 documentData.documentId = doc.id;
+//                 console.log(documentData);
+//                 docs.push(documentData);
+//             } catch(error) {
+//                 console.error('Error fetching document:', error);
+//             }
+//         });
 
-        return res.send(docs);
-    } catch(error) {
-        console.error(error);
-        return res.sendStatus(500);
-    }
-});
+//         return res.send(docs);
+//     } catch(error) {
+//         console.error(error);
+//         return res.sendStatus(500);
+//     }
+// });
 
 // Create new emergencyAlert or Update existing one with new position in 
 // poss field in case alert has not been resolved yet.
@@ -163,68 +170,68 @@ app.post('/emergencyAlerts', async (req:CustomRequest, res:Response) => {
 });
 
 // Get status of the latest opened EmergencyAlert for specified citizen.
-app.get('/emergencyAlerts/latest/:citizenId', async (req : Request, res : Response) => {
-    const { citizenId } = req.params;
+// app.get('/emergencyAlerts/latest/:citizenId', async (req : Request, res : Response) => {
+//     const { citizenId } = req.params;
 
-    // sanitize the input
-    if(!citizenId) {
-        return res.sendStatus(400);
-    }
+//     // sanitize the input
+//     if(!citizenId) {
+//         return res.sendStatus(400);
+//     }
 
-    try {
-         // Query the collection for documents with matching citizenId and sort by createdAt in descending order
-        const querySnapshot = await getFirestore()
-            .collection(COLLECTION_EMERGENCY_ALERTS)
-            .where('uid', '==', citizenId)
-            .orderBy('createdAt', 'desc')
-            .limit(1)
-            .get();
+//     try {
+//          // Query the collection for documents with matching citizenId and sort by createdAt in descending order
+//         const querySnapshot = await getFirestore()
+//             .collection(COLLECTION_EMERGENCY_ALERTS)
+//             .where('uid', '==', citizenId)
+//             .orderBy('createdAt', 'desc')
+//             .limit(1)
+//             .get();
 
-        // Check if any matching document was found
-        if (querySnapshot.empty) {
-            return res.sendStatus(404); 
-        }
+//         // Check if any matching document was found
+//         if (querySnapshot.empty) {
+//             return res.sendStatus(404); 
+//         }
 
-        // Get the first (latest) document from the query result
-        const document = querySnapshot.docs[0].data();
-        // Access the desired fields from the document
-        const { status } = document;
+//         // Get the first (latest) document from the query result
+//         const document = querySnapshot.docs[0].data();
+//         // Access the desired fields from the document
+//         const { status } = document;
 
-        return res.send({status});
+//         return res.send({status});
         
-    } catch(error) {
-        console.error(error);
-        return res.sendStatus(500);
-    }
-});
+//     } catch(error) {
+//         console.error(error);
+//         return res.sendStatus(500);
+//     }
+// });
 
-app.post('/emergencyAlerts/:uid/confirm', async (req: Request, res: Response) => {
-    try{
-        const { uid } = req.params;
-        const { status } = req.body;
+// app.post('/emergencyAlerts/:uid/confirm', async (req: Request, res: Response) => {
+//     try{
+//         const { uid } = req.params;
+//         const { status } = req.body;
 
-        // TODO: check if valid format
-        // Sanitize the input
-        if(!uid) {
-            return res.sendStatus(400);
-        }
+//         // TODO: check if valid format
+//         // Sanitize the input
+//         if(!uid) {
+//             return res.sendStatus(400);
+//         }
 
-        const docRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS).doc(uid);
-        const document = await docRef.get();
+//         const docRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS).doc(uid);
+//         const document = await docRef.get();
 
-        if(!document.exists) {
-            return res.sendStatus(404); // No matching document found
-        }
+//         if(!document.exists) {
+//             return res.sendStatus(404); // No matching document found
+//         }
 
-        await docRef.update({status});
+//         await docRef.update({status});
 
-        console.log('Document updated successfully');
-        return res.sendStatus(200);
-    }catch(error) {
-        console.error(error);
-        return res.sendStatus(500);
-    }
-});
+//         console.log('Document updated successfully');
+//         return res.sendStatus(200);
+//     }catch(error) {
+//         console.error(error);
+//         return res.sendStatus(500);
+//     }
+// });
 
 /////////////////////////////////////////////////////////////
 ////////////////// EmergencyAlerts - END //////////////////
@@ -270,29 +277,57 @@ app.post('/citizens-subscribe', async (req:CustomRequest, res:Response) => {
 // endpoint for police to subscribe to push notifications.
 // Save their device token to the firestore
 // so they can receive notifications on relevant firestore changes
-app.post('/police-subscribe', async (req:any, res:any) => {
-    const userUid = req.user.uid;
-    const {token} = req.body;
+// app.post('/police-subscribe', async (req:any, res:any) => {
+//     const userUid = req.user.uid;
+//     const {token} = req.body;
 
-    // sanitize input
-    // TODO: verify that it is valid device token first
-    if(token === undefined || token === '') {
-        return res.sendStatus(400);
-    }
+//     // sanitize input
+//     // TODO: verify that it is valid device token first
+//     if(token === undefined || token === '') {
+//         return res.sendStatus(400);
+//     }
 
-    try {
-        const docRef = await getFirestore()
-            .collection(COLLECTION_FCM_DEVICE_TOKENS_POLICE)
-            .doc(token);
-        await docRef.set({
-            userUid
-        })
-        res.sendStatus(201);
-    } catch(error) {
-        console.log(error);
-        return res.sendStatus(500);
-    }
-});
+//     try {
+//         const docRef = await getFirestore()
+//             .collection(COLLECTION_FCM_DEVICE_TOKENS_POLICE)
+//             .doc(token);
+//         await docRef.set({
+//             userUid
+//         })
+//         res.sendStatus(201);
+//     } catch(error) {
+//         console.log(error);
+//         return res.sendStatus(500);
+//     }
+// });
+
+//////////////////////////////////////////////////////
+/////////// CITIZENS - START /////////////////////////
+//////////////////////////////////////////////////////
+
+// app.get('/citizens/:citizenId', async (req: Request, res: Response) => {
+//     try {
+//         const { citizenId } = req.params;
+
+//         if(!citizenId) {
+//             return res.sendStatus(400);
+//         }
+
+//         const userRecord = await admin.auth().getUser(citizenId);
+//         return res.send({
+//             uid: userRecord.uid,
+//             phoneNumber: userRecord.phoneNumber
+//         });
+
+//     } catch (error) {
+//         console.error(error);
+//         return res.sendStatus(500);
+//     }
+// });
+
+//////////////////////////////////////////////////////
+/////////// CITIZENS - END /////////////////////////
+//////////////////////////////////////////////////////
 
 
 //////////////////////////////////////////////////////
@@ -300,38 +335,38 @@ app.post('/police-subscribe', async (req:any, res:any) => {
 //////////////////////////////////////////////////////
 
 // Send push notifications to police applications, whenever new emergencyEvent is created.
-const handleEmergencyAlertsPushNotifications = functions_firestore
-    .document('emergencyAlerts/{emergencyAlertId}')
-    .onCreate(async (snapshot, context) => {
-        console.log('TRIGGERED PUSH NOTIFICATIONS - NEW EMERGENCYALERT CREATED');
-        const emergencyAlertId = snapshot.id;
-        const emergencyAlertData = snapshot.data();
-        console.log("Data from PN", emergencyAlertId, emergencyAlertData);
+// const handleEmergencyAlertsPushNotifications = functions_firestore
+//     .document('emergencyAlerts/{emergencyAlertId}')
+//     .onCreate(async (snapshot, context) => {
+//         console.log('TRIGGERED PUSH NOTIFICATIONS - NEW EMERGENCYALERT CREATED');
+//         const emergencyAlertId = snapshot.id;
+//         const emergencyAlertData = snapshot.data();
+//         console.log("Data from PN", emergencyAlertId, emergencyAlertData);
 
-        const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_POLICE).get();
-        const tokenDocs = allTokens.docs;
-        const tokens: string[] = tokenDocs.map((tokenDoc) => tokenDoc.id);
+//         const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_POLICE).get();
+//         const tokenDocs = allTokens.docs;
+//         const tokens: string[] = tokenDocs.map((tokenDoc) => tokenDoc.id);
 
-        if(tokens.length > 0) {
-            tokens.forEach(async (token) => {
-                const data = {
-                    message: {
-                        token: token,
-                        notification: {
-                            title: emergencyAlertId,
-                            body: JSON.stringify(emergencyAlertData)
-                        }
-                    }
-                }
-                try {
-                    await admin.messaging().send(data.message);
-                } catch(error: any) {
-                    console.error(error);
-                }
+//         if(tokens.length > 0) {
+//             tokens.forEach(async (token) => {
+//                 const data = {
+//                     message: {
+//                         token: token,
+//                         notification: {
+//                             title: emergencyAlertId,
+//                             body: JSON.stringify(emergencyAlertData)
+//                         }
+//                     }
+//                 }
+//                 try {
+//                     await admin.messaging().send(data.message);
+//                 } catch(error: any) {
+//                     console.error(error);
+//                 }
 
-            });
+//             });
             
-        };
+//         };
         // // Get the list of device tokens.
         // const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_POLICE).get();
         // const tokens = [];
@@ -355,7 +390,7 @@ const handleEmergencyAlertsPushNotifications = functions_firestore
         //     //await cleanupTokens(response, tokens);
         //     console.log('Notifications have been send and tokens cleand up');
         // }
-    });
+//    });
 
 // Send push notification to citizens applications, whenever it's status changes
 const handleEmergencAlertStatusChange = functions_firestore
@@ -417,6 +452,133 @@ const handleEmergencAlertStatusChange = functions_firestore
         }
     });
 
+
+//////////////////////////////////////////////////////////////////
+//////////////////// POLICE //////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+app.post('/police-login', async (req:Request, res:Response) => {
+    const { login, pass } = req.body;
+
+    // Sanitize the input
+    if(!login || !pass ) {
+        return res.sendStatus(400);
+    }
+    try {
+        // store uid and token into firestore
+        const docRef = getFirestore()
+            .collection(COLLECTION_POLICE_LOGIN)
+            .doc(login);
+        const doc = await docRef.get();
+        if(!doc.exists) {
+            return res.sendStatus(404);
+        } else {
+            const docData = doc.data();
+            if(docData.pass === pass) {
+                if(!docData.ticket) {
+                    const newTicket = `${Date.now()}-123456-ipaddress`;
+                    await docRef.update({ticket: newTicket});
+                    return res.send({ticket: newTicket});
+                } else {
+                    return res.send({ticket: docData.ticket});
+                }
+            } else {
+                return res.sendStatus(401);
+            }
+        }
+    } catch(error) {
+        console.log(error);
+        return res.sendStatus(500);
+    }
+});
+
+
+
+// function getAllEmergencyAlerts(collectionRef) {
+//     return new Promise((resolve, reject) => {
+
+//             collectionRef
+//                     .get()
+//                     .then((querySnapshot) => {
+//                             var allEmergencyAlerts = [];
+//                             var citizenPromises = [];
+//                             querySnapshot.forEach((doc) => {
+//                                     var emergencyAlert = doc.data();
+//                                     emergencyAlert.uid = doc.id;
+//                                     allEmergencyAlerts.push(emergencyAlert);
+//                                     console.log(emergencyAlert.userId);
+//                                     var citizenPromise = admin.auth().getUser(emergencyAlert.userId);
+//                                     citizenPromises.push(citizenPromise);
+//                             });
+
+//                             // Wait for all citizen data promises to resolve
+//                             Promise.all(citizenPromises)
+//                                     .then((citizenSnapshots)=> {
+//                                             citizenSnapshots.forEach((citizenSnapshot, index) => {
+//                                                     if(citizenSnapshot.exists){
+
+//                                                             var citizenData = citizenSnapshot.data();
+//                                                             allEmergencyAlerts[index].citizen = citizenData;
+//                                                     } else {
+//                                                             console.log('no citizen data found ');
+//                                                     }
+//                                             });
+//                                             resolve(allEmergencyAlerts);
+// //                                              console.log(JSON.stringify(allEmergencyAlerts));
+//             //                              resolve(allEmergencyAlerts);
+//                                     }).catch((error) => {
+//                                             reject(error);
+//                                     });
+//                     })
+//                     .catch((error) => {
+//                             reject(error);
+//                     });
+//     });
+// }
+
+async function getAllEmergencyAlerts(collectionRef) {
+    try {
+        const querySnapshot = await collectionRef.get();
+        const allEmergencyAlerts = [];
+
+        for(const doc of querySnapshot.docs) {
+            const emergencyAlert = doc.data();
+            emergencyAlert.uid = doc.id;
+            allEmergencyAlerts.push(emergencyAlert);
+            
+            try {
+                const citizenSnapshot = await admin.auth().getUser(emergencyAlert.userId);
+                const citizenData = citizenSnapshot.toJSON();
+                if(citizenData) {
+                    const citizenDataToAdd = {uid: citizenSnapshot.uid, phoneNumber: citizenSnapshot.phoneNumber}
+
+                    allEmergencyAlerts[allEmergencyAlerts.length - 1].citizen = citizenDataToAdd;
+                } else {
+                    console.log('No citizen data found');
+                }
+            } catch(error) {
+                console.log('Error retrieving citizen data: ', error);
+            }
+        }
+        return allEmergencyAlerts;
+
+    } catch(error) {
+        throw error;
+    }
+}
+
+app.get('/citizen', async (req: Request, res: Response) => {
+    //const userUid = 'pg9PbXeBhzP1GtPNGYDMhYT7HyR2';
+    try {
+        const user = await getAllEmergencyAlerts(getFirestore()
+        .collection(COLLECTION_EMERGENCY_ALERTS));
+        return res.send(JSON.stringify(user));
+    } catch (error) {
+        console.log(error);
+        return res.sendStatus(500);
+    }
+});
+
+
 exports.app = onRequest(app);
-exports.sendNotifications = handleEmergencyAlertsPushNotifications;
+//exports.sendNotifications = handleEmergencyAlertsPushNotifications;
 exports.handleStatusChange = handleEmergencAlertStatusChange;
