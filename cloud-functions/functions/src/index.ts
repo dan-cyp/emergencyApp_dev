@@ -43,37 +43,37 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // Express middleware that validates Firebase ID Tokens passed in the Authorization HTTP header.
 // The Firebase ID token needs to be passed as a Bearer token in the Authorization HTTP header like this:
 // `Authorization: Bearer <Firebase ID Token>`.
-// when decoded successfully, the ID Token content will be added as `req.user`.
-// const authenticate = async (req:CustomRequest, res:Response, next:any) => {
-//     // Specify paths that do not need authentication
-//     if(req.path === '/police-login') {
-//         next();
-//         return;
-//     }
+//when decoded successfully, the ID Token content will be added as `req.user`.
+const authenticate = async (req:CustomRequest, res:Response, next:any) => {
+    // Specify paths that do not need authentication
+    if(req.path === '/police-login') {
+        next();
+        return;
+    }
 
-//     if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
-//       res.status(403).send('Unauthorized');
-//       return;
-//     }
-//     const idToken = req.headers.authorization.split('Bearer ')[1];
-//     try {
-//         // Cheat to test with 1234 and 4321 tokens
-//         if(idToken == '1234') {
-//             req.user = {uid: '4321'};
-//             next();
-//             return;
-//         }
-//       const decodedIdToken = await admin.auth().verifyIdToken(idToken);
-//       req.user = decodedIdToken;
-//       next();
-//       return;
-//     } catch(e) {
-//       res.status(403).send('Unauthorized');
-//       return;
-//     }
-//   };
+    if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
+      res.status(403).send('Unauthorized');
+      return;
+    }
+    const idToken = req.headers.authorization.split('Bearer ')[1];
+    try {
+        // Cheat to test with 1234 and 4321 tokens
+        if(idToken == '1234') {
+            req.user = {uid: 'gaVOHEZdnGYKX6rbPUiUmnPK0vu2'};
+            next();
+            return;
+        }
+      const decodedIdToken = await admin.auth().verifyIdToken(idToken);
+      req.user = decodedIdToken;
+      next();
+      return;
+    } catch(e) {
+      res.status(403).send('Unauthorized');
+      return;
+    }
+  };
   
-//  app.use(authenticate);
+ app.use(authenticate);
 
 /////////////////////////////////////////////////////////////
 ////////////////// Authentication - END /////////////////////
@@ -108,6 +108,27 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 //         return res.sendStatus(500);
 //     }
 // });
+
+
+// Add extra information about the citizen
+app.post('/citizens', async(req: CustomRequest, res:Response) => {
+    const userId = req.user.uid;
+    const { fullName } = req.body;
+
+    if(!fullName) {
+        return res.sendStatus(400);
+    }
+
+    try {
+        await admin.auth().setCustomUserClaims(userId, {fullName});
+        return res.sendStatus(200);
+    } catch(error) {
+        console.log(error);
+        return res.sendStatus(500);
+    }
+});
+
+
 
 // Create new emergencyAlert or Update existing one with new position in 
 // poss field in case alert has not been resolved yet.
@@ -314,10 +335,7 @@ app.post('/citizens-subscribe', async (req:CustomRequest, res:Response) => {
 //         }
 
 //         const userRecord = await admin.auth().getUser(citizenId);
-//         return res.send({
-//             uid: userRecord.uid,
-//             phoneNumber: userRecord.phoneNumber
-//         });
+//         return res.send(JSON.stringify(userRecord));
 
 //     } catch (error) {
 //         console.error(error);
@@ -492,91 +510,48 @@ app.post('/police-login', async (req:Request, res:Response) => {
 });
 
 
+// async function getAllEmergencyAlerts(collectionRef) {
+//     try {
+//         const querySnapshot = await collectionRef.get();
+//         const allEmergencyAlerts = [];
 
-// function getAllEmergencyAlerts(collectionRef) {
-//     return new Promise((resolve, reject) => {
+//         for(const doc of querySnapshot.docs) {
+//             const emergencyAlert = doc.data();
+//             emergencyAlert.uid = doc.id;
+//             allEmergencyAlerts.push(emergencyAlert);
+            
+//             try {
+//                 const citizenSnapshot = await admin.auth().getUser(emergencyAlert.userId);
+//                 const citizenData = citizenSnapshot.toJSON();
+//                 if(citizenData) {
+//                     const citizenDataToAdd = {uid: citizenSnapshot.uid, phoneNumber: citizenSnapshot.phoneNumber}
 
-//             collectionRef
-//                     .get()
-//                     .then((querySnapshot) => {
-//                             var allEmergencyAlerts = [];
-//                             var citizenPromises = [];
-//                             querySnapshot.forEach((doc) => {
-//                                     var emergencyAlert = doc.data();
-//                                     emergencyAlert.uid = doc.id;
-//                                     allEmergencyAlerts.push(emergencyAlert);
-//                                     console.log(emergencyAlert.userId);
-//                                     var citizenPromise = admin.auth().getUser(emergencyAlert.userId);
-//                                     citizenPromises.push(citizenPromise);
-//                             });
+//                     allEmergencyAlerts[allEmergencyAlerts.length - 1].citizen = citizenDataToAdd;
+//                 } else {
+//                     console.log('No citizen data found');
+//                 }
+//             } catch(error) {
+//                 console.log('Error retrieving citizen data: ', error);
+//             }
+//         }
+//         return allEmergencyAlerts;
 
-//                             // Wait for all citizen data promises to resolve
-//                             Promise.all(citizenPromises)
-//                                     .then((citizenSnapshots)=> {
-//                                             citizenSnapshots.forEach((citizenSnapshot, index) => {
-//                                                     if(citizenSnapshot.exists){
-
-//                                                             var citizenData = citizenSnapshot.data();
-//                                                             allEmergencyAlerts[index].citizen = citizenData;
-//                                                     } else {
-//                                                             console.log('no citizen data found ');
-//                                                     }
-//                                             });
-//                                             resolve(allEmergencyAlerts);
-// //                                              console.log(JSON.stringify(allEmergencyAlerts));
-//             //                              resolve(allEmergencyAlerts);
-//                                     }).catch((error) => {
-//                                             reject(error);
-//                                     });
-//                     })
-//                     .catch((error) => {
-//                             reject(error);
-//                     });
-//     });
+//     } catch(error) {
+//         throw error;
+//     }
 // }
 
-async function getAllEmergencyAlerts(collectionRef) {
-    try {
-        const querySnapshot = await collectionRef.get();
-        const allEmergencyAlerts = [];
-
-        for(const doc of querySnapshot.docs) {
-            const emergencyAlert = doc.data();
-            emergencyAlert.uid = doc.id;
-            allEmergencyAlerts.push(emergencyAlert);
-            
-            try {
-                const citizenSnapshot = await admin.auth().getUser(emergencyAlert.userId);
-                const citizenData = citizenSnapshot.toJSON();
-                if(citizenData) {
-                    const citizenDataToAdd = {uid: citizenSnapshot.uid, phoneNumber: citizenSnapshot.phoneNumber}
-
-                    allEmergencyAlerts[allEmergencyAlerts.length - 1].citizen = citizenDataToAdd;
-                } else {
-                    console.log('No citizen data found');
-                }
-            } catch(error) {
-                console.log('Error retrieving citizen data: ', error);
-            }
-        }
-        return allEmergencyAlerts;
-
-    } catch(error) {
-        throw error;
-    }
-}
-
-app.get('/citizen', async (req: Request, res: Response) => {
-    //const userUid = 'pg9PbXeBhzP1GtPNGYDMhYT7HyR2';
-    try {
-        const user = await getAllEmergencyAlerts(getFirestore()
-        .collection(COLLECTION_EMERGENCY_ALERTS));
-        return res.send(JSON.stringify(user));
-    } catch (error) {
-        console.log(error);
-        return res.sendStatus(500);
-    }
-});
+// app.get('/citizen', async (req: Request, res: Response) => {
+//     //const userUid = 'pg9PbXeBhzP1GtPNGYDMhYT7HyR2';
+//     try {
+//         const user = await getAllEmergencyAlerts(getFirestore()
+//         .collection(COLLECTION_EMERGENCY_ALERTS));
+//         return res.send(JSON.stringify(user));
+//     } catch (error) {
+//         console.log(error);
+//         return res.sendStatus(500);
+//     }
+// });
 
 
 exports.app = onRequest(app);
