@@ -20,6 +20,7 @@ const COLLECTION_FCM_DEVICE_TOKENS_CITIZENS = 'fcmTokens-citizens';
 // device tokens of police app to be able to receive push notifications
 //const COLLECTION_FCM_DEVICE_TOKENS_POLICE = 'fcmTokens-police';
 const COLLECTION_POLICE_LOGIN = 'police-login';
+const COLLECTION_POLICE_WSS = 'police-wss';
 
 interface EmergencyAlertData {
     lat: number,
@@ -46,7 +47,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 //when decoded successfully, the ID Token content will be added as `req.user`.
 const authenticate = async (req:CustomRequest, res:Response, next:any) => {
     // Specify paths that do not need authentication
-    if(req.path === '/police-login') {
+    if(req.path === '/police-login' || req.path === '/police-wss') {
         next();
         return;
     }
@@ -191,40 +192,40 @@ app.post('/emergencyAlerts', async (req:CustomRequest, res:Response) => {
 });
 
 // Get status of the latest opened EmergencyAlert for specified citizen.
-// app.get('/emergencyAlerts/latest/:citizenId', async (req : Request, res : Response) => {
-//     const { citizenId } = req.params;
+app.get('/emergencyAlerts/latest/', async (req : CustomRequest, res : Response) => {
+    const citizenId = req.user.uid;
 
-//     // sanitize the input
-//     if(!citizenId) {
-//         return res.sendStatus(400);
-//     }
+    // sanitize the input
+    if(!citizenId) {
+        return res.sendStatus(400);
+    }
 
-//     try {
-//          // Query the collection for documents with matching citizenId and sort by createdAt in descending order
-//         const querySnapshot = await getFirestore()
-//             .collection(COLLECTION_EMERGENCY_ALERTS)
-//             .where('uid', '==', citizenId)
-//             .orderBy('createdAt', 'desc')
-//             .limit(1)
-//             .get();
+    try {
+         // Query the collection for documents with matching citizenId and sort by createdAt in descending order
+        const querySnapshot = await getFirestore()
+            .collection(COLLECTION_EMERGENCY_ALERTS)
+            .where('userId', '==', citizenId)
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
 
-//         // Check if any matching document was found
-//         if (querySnapshot.empty) {
-//             return res.sendStatus(404); 
-//         }
+        // Check if any matching document was found
+        if (querySnapshot.empty) {
+            return res.send({status: "notStarted"});
+        }
 
-//         // Get the first (latest) document from the query result
-//         const document = querySnapshot.docs[0].data();
-//         // Access the desired fields from the document
-//         const { status } = document;
+        // Get the first (latest) document from the query result
+        const document = querySnapshot.docs[0].data();
+        // Access the desired fields from the document
+        const { status } = document;
 
-//         return res.send({status});
+        return res.send({status});
         
-//     } catch(error) {
-//         console.error(error);
-//         return res.sendStatus(500);
-//     }
-// });
+    } catch(error) {
+        console.error(error);
+        return res.sendStatus(500);
+    }
+});
 
 // app.post('/emergencyAlerts/:uid/confirm', async (req: Request, res: Response) => {
 //     try{
@@ -433,7 +434,7 @@ const handleEmergencAlertStatusChange = functions_firestore
                             token: token,
                             notification: {
                                 title: emergencyAlertId,
-                                body: newStatusResponse
+                                body: JSON.stringify({status: newStatusResponse}),
                             }
                         }
                     }
@@ -509,6 +510,23 @@ app.post('/police-login', async (req:Request, res:Response) => {
     }
 });
 
+app.get('/police-wss', async(req: Request, res: Response) => {
+    try {
+        const querySnapshot = await getFirestore().collection(COLLECTION_POLICE_WSS).limit(1).get();
+        
+        if (!querySnapshot.empty) {
+          const firstDocument = querySnapshot.docs[0].data();
+          console.log(firstDocument);
+          return res.send({ipaddress: firstDocument.ipaddress, port: firstDocument.port});
+        } else {
+          console.log("No documents found.");
+          return res.sendStatus(404);
+        }
+    } catch(error) {
+        console.log(error);
+        return res.sendStatus(500);
+    }
+});
 
 // async function getAllEmergencyAlerts(collectionRef) {
 //     try {
