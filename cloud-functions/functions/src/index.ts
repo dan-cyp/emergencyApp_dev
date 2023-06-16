@@ -114,19 +114,45 @@ const authenticate = async (req:CustomRequest, res:Response, next:any) => {
 // Add extra information about the citizen
 app.post('/citizens', async(req: CustomRequest, res:Response) => {
     const userId = req.user.uid;
-    const { fullName } = req.body;
+    const { fullName, address, secondaryPhoneNo, contactPersonPhoneNo } = req.body;
 
-    if(!fullName) {
-        return res.sendStatus(400);
-    }
+    // if(!fullName) {
+    //     return res.sendStatus(400);
+    // }
 
     try {
-        await admin.auth().setCustomUserClaims(userId, {fullName});
+        await admin.auth().setCustomUserClaims(userId, {fullName, address, secondaryPhoneNo, contactPersonPhoneNo});
         return res.sendStatus(200);
     } catch(error) {
         console.log(error);
         return res.sendStatus(500);
     }
+});
+
+app.get('/citizenInfo', async(req: CustomRequest, res: Response) => {
+    const userId = req.user.uid;
+
+    try {
+        const userRecord = await admin.auth().getUser(userId);
+        let citizenInfo: {
+            uid: string; 
+            fullName?: string, 
+            address?: string, 
+            secondaryPhoneNo?: string,
+            contactPersonPhoneNo?: string,
+        } = { uid: userId };
+        if(userRecord.customClaims) {
+            citizenInfo.fullName = userRecord.customClaims.fullName;
+            citizenInfo.address = userRecord.customClaims.address;
+            citizenInfo.secondaryPhoneNo = userRecord.customClaims.secondaryPhoneNo;
+            citizenInfo.contactPersonPhoneNo = userRecord.customClaims.contactPersonPhoneNo;
+        }
+        return res.send(citizenInfo);
+    } catch(error) {
+        console.log(error);
+        return res.sendStatus(500);
+    }
+
 });
 
 

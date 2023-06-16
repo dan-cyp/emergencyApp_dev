@@ -26,12 +26,16 @@ async function getAllEmergencyAlerts(collectionRef) {
                 if(citizenData) {
                         console.log(JSON.stringify(citizenData));
                         var fullName = '';
+                        var address = '';
+                        var phoneNumbers = [];
 
                         if(citizenSnapshot.customClaims) {
                                 fullName = citizenSnapshot.customClaims.fullName;
+                                address = citizenSnapshot.customClaims.address;
+                                phoneNumbers = citizenSnapshot.customClaims.phoneNumebrs;
                         }
                    
-                    const citizenDataToAdd = {uid: citizenSnapshot.uid, phoneNumber: citizenSnapshot.phoneNumber, fullName: fullName}
+                    const citizenDataToAdd = {uid: citizenSnapshot.uid, phoneNumber: citizenSnapshot.phoneNumber, fullName: fullName, address: address, phoneNumbers: phoneNumbers}
 
                     allEmergencyAlerts[allEmergencyAlerts.length - 1].citizen = citizenDataToAdd;
                 } else {
@@ -161,12 +165,19 @@ collectionRef.onSnapshot((snapshot) => {
                         try{
                                 const citizenSnapshot = await admin.auth().getUser(updatedDoc.userId);
                                 var fullName = '';
+                                var address = '';
+                                var phoneNumbers = [];
                                 if(citizenSnapshot.customClaims) {
                                         fullName = citizenSnapshot.customClaims.fullName;
+                                        address = citizenSnapshot.customClaims.address;
+                                        phoneNumbers = citizenSnapshot.customClaims.phoneNumbers;
                                 }
                                 updatedDoc.citizen = {uid: citizenSnapshot.uid, 
                                 phoneNumber: citizenSnapshot.phoneNumber,
-                                fullName: fullName};
+                                fullName: fullName,
+                                address: address,
+                                phoneNumebrs: phoneNumbers,
+                        };
                         } catch(error) {
                                 console.log('error in retriving user information');
                         }
