@@ -443,15 +443,25 @@ const handleEmergencAlertStatusChange = functions_firestore
     .onUpdate(async (change, context) => {
         const prevValue = change.before.data();
         const newValue = change.after.data();
-        const emergencyAlertId = change.before.id;
-        const newStatusResponse = `${prevValue.status} -> ${newValue.status}`;
+        //const emergencyAlertId = change.before.id;
+        const newStatus = newValue.status;
 
+        const userId = prevValue.userId;
 
         if(newValue.status !== prevValue.status) {
 
-            const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS).get();
-            const tokenDocs = allTokens.docs;
+            const allUsersTokens = await getFirestore()
+                .collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS)
+                .where('userUid', '==', userId)
+                .get();
+            const tokenDocs = allUsersTokens.docs;
             const tokens: string[] = tokenDocs.map((tokenDoc) => tokenDoc.id);
+            var notificationBody = 'Nastala zmena v stave vasej ziadosti o pomoc.';
+            if(newStatus === 'acknowledged') {
+                notificationBody = 'Na Vasom ziadosti o pomoc sa aktivne pracuje.';
+            } else if(newStatus === 'finished') {
+                notificationBody = 'Vasa ziadost o pomoc bola uspesne dokoncena.';
+            }
 
             if(tokens.length > 0){
                 tokens.forEach(async (token) => {
@@ -459,9 +469,12 @@ const handleEmergencAlertStatusChange = functions_firestore
                         message: {
                             token: token,
                             notification: {
-                                title: emergencyAlertId,
-                                body: JSON.stringify({status: newStatusResponse}),
-                            }
+                                title: "Zmena v stave ziadosti o pomoc.",
+                                body: notificationBody,
+                            },
+                            data: {
+                                status: newStatus
+                            },
                         }
                     }
                     try{
