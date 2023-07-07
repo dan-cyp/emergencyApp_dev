@@ -10,11 +10,19 @@ import express from 'express';
 import { Request, Response } from 'express';
 import path from 'path';
 import cors from 'cors';
+
+import {getClosestPoliceStation} from './police_station_locator';
+import { POLICE_STATION_MI_NAMECODE, POLICE_STATION_KE_NAMECODE, POLICE_STATION_NOT_AVAILABLE_NAMECODE } from './police_station_locator';
+
 const app = express();
 app.use(cors());
 
 // Firestore document collections
-const COLLECTION_EMERGENCY_ALERTS = 'emergencyAlerts';
+//const COLLECTION_EMERGENCY_ALERTS = 'emergencyAlerts';
+const COLLECTION_EMERGENCY_ALERTS_MI = 'emergencyAlerts-mi';
+const COLLECTION_EMERGENCY_ALERTS_KE = 'emergencyAlerts-ke';
+const COLLECTION_EMERGENCY_ALERTS_OTHERS = 'emergancyAlerts-others';
+
 // device tokens of citizens app to be able to receive push notifications
 const COLLECTION_FCM_DEVICE_TOKENS_CITIZENS = 'fcmTokens-citizens';
 // device tokens of police app to be able to receive push notifications
@@ -173,8 +181,27 @@ app.post('/emergencyAlerts', async (req:CustomRequest, res:Response) => {
 
         // TODO: check that uid, lat, lng and createdAt are valid data)
 
+        // find closest police station
+        const closestPoliceStation = getClosestPoliceStation(lat, lng);
+        console.log("Closest police station: ", closestPoliceStation);
+        
+        let collectionName = COLLECTION_EMERGENCY_ALERTS_OTHERS;
+        switch (closestPoliceStation) {
+            case POLICE_STATION_MI_NAMECODE:
+                collectionName = COLLECTION_EMERGENCY_ALERTS_MI;
+                break;
+            case POLICE_STATION_KE_NAMECODE:
+                collectionName = COLLECTION_EMERGENCY_ALERTS_KE;
+                break;
+            default:
+                collectionName = COLLECTION_EMERGENCY_ALERTS_OTHERS;
+                break;
+        }
+
+        console.log('Collection to add to:', collectionName);
+
         // Get latest emergencyAlert
-        const emergencyAlertsRef = getFirestore().collection(COLLECTION_EMERGENCY_ALERTS);
+        const emergencyAlertsRef = getFirestore().collection(collectionName);
         const querySnapshot = await emergencyAlertsRef
             .where('userId', '==', userId)
             .orderBy('createdAt', 'desc')
@@ -229,7 +256,7 @@ app.get('/emergencyAlerts/latest/', async (req : CustomRequest, res : Response) 
     try {
          // Query the collection for documents with matching citizenId and sort by createdAt in descending order
         const querySnapshot = await getFirestore()
-            .collection(COLLECTION_EMERGENCY_ALERTS)
+            .collection(COLLECTION_EMERGENCY_ALERTS_MI)
             .where('userId', '==', citizenId)
             .orderBy('createdAt', 'desc')
             .limit(1)
@@ -439,7 +466,7 @@ app.post('/citizens-subscribe', async (req:CustomRequest, res:Response) => {
 
 // Send push notification to citizens applications, whenever it's status changes
 const handleEmergencAlertStatusChange = functions_firestore
-    .document(`${COLLECTION_EMERGENCY_ALERTS}/{documentId}`)
+    .document(`${COLLECTION_EMERGENCY_ALERTS_MI}/{documentId}`)
     .onUpdate(async (change, context) => {
         const prevValue = change.before.data();
         const newValue = change.after.data();
@@ -448,7 +475,7 @@ const handleEmergencAlertStatusChange = functions_firestore
 
         const userId = prevValue.userId;
 
-        if(newValue.status !== prevValue.status) {
+        if (newValue.status !== prevValue.status) {
 
             const allUsersTokens = await getFirestore()
                 .collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS)
@@ -457,13 +484,13 @@ const handleEmergencAlertStatusChange = functions_firestore
             const tokenDocs = allUsersTokens.docs;
             const tokens: string[] = tokenDocs.map((tokenDoc) => tokenDoc.id);
             var notificationBody = 'Nastala zmena v stave vasej ziadosti o pomoc.';
-            if(newStatus === 'acknowledged') {
+            if (newStatus === 'acknowledged') {
                 notificationBody = 'Na Vasom ziadosti o pomoc sa aktivne pracuje.';
-            } else if(newStatus === 'finished') {
+            } else if (newStatus === 'finished') {
                 notificationBody = 'Vasa ziadost o pomoc bola uspesne dokoncena.';
             }
 
-            if(tokens.length > 0){
+            if (tokens.length > 0) {
                 tokens.forEach(async (token) => {
                     const data = {
                         message: {
@@ -477,13 +504,13 @@ const handleEmergencAlertStatusChange = functions_firestore
                             },
                         }
                     }
-                    try{
+                    try {
                         await admin.messaging().send(data.message);
-                    } catch(error:any) {
+                    } catch (error: any) {
                         console.error(error);
-                    }       
+                    }
                 });
-            }   
+            }
             // // Get the list of device tokens.
             // const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS).get();
             // const tokens = [];
@@ -509,6 +536,79 @@ const handleEmergencAlertStatusChange = functions_firestore
             // }
         }
     });
+
+// // Send push notification to citizens applications, whenever it's status changes
+// const handleEmergencAlertStatusChange = functions_firestore
+//     .document(`${COLLECTION_EMERGENCY_ALERTS_MI}/{documentId}`)
+//     .onUpdate(async (change, context) => {
+//         const prevValue = change.before.data();
+//         const newValue = change.after.data();
+//         //const emergencyAlertId = change.before.id;
+//         const newStatus = newValue.status;
+
+//         const userId = prevValue.userId;
+
+//         if (newValue.status !== prevValue.status) {
+
+//             const allUsersTokens = await getFirestore()
+//                 .collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS)
+//                 .where('userUid', '==', userId)
+//                 .get();
+//             const tokenDocs = allUsersTokens.docs;
+//             const tokens: string[] = tokenDocs.map((tokenDoc) => tokenDoc.id);
+//             var notificationBody = 'Nastala zmena v stave vasej ziadosti o pomoc.';
+//             if (newStatus === 'acknowledged') {
+//                 notificationBody = 'Na Vasom ziadosti o pomoc sa aktivne pracuje.';
+//             } else if (newStatus === 'finished') {
+//                 notificationBody = 'Vasa ziadost o pomoc bola uspesne dokoncena.';
+//             }
+
+//             if (tokens.length > 0) {
+//                 tokens.forEach(async (token) => {
+//                     const data = {
+//                         message: {
+//                             token: token,
+//                             notification: {
+//                                 title: "Zmena v stave ziadosti o pomoc.",
+//                                 body: notificationBody,
+//                             },
+//                             data: {
+//                                 status: newStatus
+//                             },
+//                         }
+//                     }
+//                     try {
+//                         await admin.messaging().send(data.message);
+//                     } catch (error: any) {
+//                         console.error(error);
+//                     }
+//                 });
+//             }
+//             // // Get the list of device tokens.
+//             // const allTokens = await getFirestore().collection(COLLECTION_FCM_DEVICE_TOKENS_CITIZENS).get();
+//             // const tokens = [];
+//             // allTokens.forEach((tokenDoc) => {
+//             //     tokens.push(tokenDoc.id);
+//             // });
+
+
+//             // if(tokens.length > 0) {
+//             //     const data = {
+//             //         message: {
+//             //             token: tokens[0],
+//             //             notification: {
+//             //                 title: emergencyAlertId,
+//             //                 body: newStatusResponse
+//             //             }
+//             //         }
+//             //     };
+
+//             //     await admin.messaging().send(data.message);
+//             //     //await cleanupTokens(response, tokens);
+//             //     console.log('Notifications have been send and tokens cleand up');
+//             // }
+//         }
+//     });
 
 
 //////////////////////////////////////////////////////////////////
